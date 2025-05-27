@@ -74,4 +74,30 @@ async def kalender_verwalten(request: Request):
         else:
             return {"status": "keine gemeinsamen termine gefunden"}
 
+    elif aktion == "kombi_buchen":
+        kunden = body.get("daten", {}).get("kunden", [])
+        if len(kunden) < 2:
+            return {"status": "mindestens zwei kunden erforderlich"}
+
+        erfolge = []
+        for kunde in kunden:
+            leistung = kunde.get("leistung")
+            passende = finde_mitarbeiter_fuer_leistung(leistung)
+            if not passende:
+                erfolge.append({"name": kunde.get("name"), "status": "kein friseur gefunden"})
+                continue
+            name = passende[0]
+            kalender_id = CALENDAR_IDS[name]
+            ok = buche_termin(
+                kalender_id,
+                kunde.get("name"),
+                kunde.get("leistung"),
+                kunde.get("datum"),
+                kunde.get("uhrzeit"),
+                kunde.get("bemerkung")
+            )
+            erfolge.append({"name": kunde.get("name"), "status": "ok" if ok else "fehler"})
+
+        return {"status": "fertig", "buchungen": erfolge}
+
     return {"status": "unbekannte aktion"}
