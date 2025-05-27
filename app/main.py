@@ -30,15 +30,23 @@ async def kalender_verwalten(request: Request):
 
     elif aktion == "loeschen":
         data = TerminAbsage(**body["daten"])
-        mitarbeiter = data.leistung and finde_mitarbeiter_fuer_leistung(data.leistung)[0]
-        kalender_id = CALENDAR_IDS.get(mitarbeiter)
+        if not data.leistung:
+            return {"status": "fehler", "info": "Leistung fehlt"}
+        mitarbeiter_liste = finde_mitarbeiter_fuer_leistung(data.leistung)
+        if not mitarbeiter_liste:
+            return {"status": "fehler", "info": "Kein passender Friseur gefunden"}
+        kalender_id = CALENDAR_IDS.get(mitarbeiter_liste[0])
         erfolg = loesche_termin(kalender_id, data.name, data.datum, data.uhrzeit)
         return {"status": "ok" if erfolg else "fehler"}
 
     elif aktion == "verschieben":
         data = TerminVerschiebung(**body["daten"])
-        mitarbeiter = data.leistung and finde_mitarbeiter_fuer_leistung(data.leistung)[0]
-        kalender_id = CALENDAR_IDS.get(mitarbeiter)
+        if not data.leistung:
+            return {"status": "fehler", "info": "Leistung fehlt"}
+        mitarbeiter_liste = finde_mitarbeiter_fuer_leistung(data.leistung)
+        if not mitarbeiter_liste:
+            return {"status": "fehler", "info": "Kein passender Friseur gefunden"}
+        kalender_id = CALENDAR_IDS.get(mitarbeiter_liste[0])
         erfolg = verschiebe_termin(
             kalender_id, data.name,
             data.alt_datum, data.alt_uhrzeit,
