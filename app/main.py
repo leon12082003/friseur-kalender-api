@@ -1,18 +1,12 @@
 from fastapi import FastAPI, Request
 from app.models import (
     TerminAnfrage, TerminAbsage, TerminVerschiebung,
-    FreieZeitenAnfrage
+    FreieZeitenAnfrage, KombiBuchung
 )
 from app.calendar_logic import *
-from app.config import MITARBEITER
+from app.config import CALENDAR_IDS
 
 app = FastAPI()
-
-def finde_mitarbeiter_nach_leistung(leistung: str):
-    for name, info in MITARBEITER.items():
-        if leistung in info.get("leistungen", []):
-            return name
-    return None
 
 @app.post("/kalender-verwalten")
 async def kalender_verwalten(request: Request):
@@ -21,43 +15,36 @@ async def kalender_verwalten(request: Request):
 
     if aktion == "buchen":
         data = TerminAnfrage(**body["daten"])
-        mitarbeiter = data.bevorzugt or finde_mitarbeiter_nach_leistung(data.leistung)
-        if not mitarbeiter:
-            return {"status": "fehler", "info": "Kein passender Friseur gefunden"}
-        kalender_id = CALENDAR_IDS[mitarbeiter]
-        erfolg = buche_termin(kalender_id, data.name, data.leistung, data.datum, data.uhrzeit, data.bemerkung)
+        kalender_id = CALENDAR_IDS.get(data.friseur)
+        if not kalender_id:
+            return {"status": "fehler", "info": "Friseur nicht gefunden"}
+        erfolg = buche_termin(kalender_id, data.name, "Termin", data.datum, data.uhrzeit, data.bemerkung)
         return {"status": "ok" if erfolg else "fehler"}
 
     elif aktion == "abfragen":
         data = FreieZeitenAnfrage(**body["daten"])
-        mitarbeiter = finde_mitarbeiter_nach_leistung(data.leistung)
-        if not mitarbeiter:
-            return {"status": "fehler", "info": "Keine zuständige Person gefunden"}
-        kalender_id = CALENDAR_IDS[mitarbeiter]
-        freie_termine = finde_naechste_freie_termine(kalender_id, data.leistung)
+        kalender_id = CALENDAR_IDS.get(data.friseur)
+        if not kalender_id:
+            return {"status": "fehler", "info": "Friseur nicht gefunden"}
+        freie_termine = finde_naechste_freie_termine(kalender_id, "Termin")
         return {"freie_termine": freie_termine}
 
     elif aktion == "loeschen":
         data = TerminAbsage(**body["daten"])
-        if not data.leistung:
-            return {"status": "fehler", "info": "Leistung fehlt"}
-        mitarbeiter = finde_mitarbeiter_nach_leistung(data.leistung)
-        if not mitarbeiter:
-            return {"status": "fehler", "info": "Kein passender Friseur gefunden"}
-        kalender_id = CALENDAR_IDS.get(mitarbeiter)
+        kalender_id = CALENDAR_IDS.get(data.friseur)
+        if not kalender_id:
+            return {"status": "fehler", "info": "Friseur nicht gefunden"}
         erfolg = loesche_termin(kalender_id, data.name, data.datum, data.uhrzeit)
         return {"status": "ok" if erfolg else "fehler"}
 
     elif aktion == "verschieben":
         data = TerminVerschiebung(**body["daten"])
-        if not data.leistung:
-            return {"status": "fehler", "info": "Leistung fehlt"}
-        mitarbeiter = finde_mitarbeiter_nach_leistung(data.leistung)
-        if not mitarbeiter:
-            return {"status": "fehler", "info": "Kein passender Friseur gefunden"}
-        kalender_id = CALENDAR_IDS.get(mitarbeiter)
+        kalender_id = CALENDAR_IDS.get(data.friseur)
+        if not kalender_id:
+            return {"status": "fehler", "info": "Friseur nicht gefunden"}
         erfolg = verschiebe_termin(
-            kalender_id, data.name,
+            kalender_id,
+            data.name,
             data.alt_datum, data.alt_uhrzeit,
             data.neu_datum, data.neu_uhrzeit
         )
@@ -70,11 +57,11 @@ async def kalender_verwalten(request: Request):
 
         kalender_ids = []
         for kunde in kunden:
-            leistung = kunde.get("leistung")
-            mitarbeiter = finde_mitarbeiter_nach_leistung(leistung)
-            if not mitarbeiter:
-                return {"status": f"keine zuständige friseur:in für '{leistung}' gefunden"}
-            kalender_ids.append(CALENDAR_IDS[mitarbeiter])
+            friseur = kunde.get("friseur")
+            kalender_id = CALENDAR_IDS.get(friseur)
+            if not kalender_id:
+                return {"status": f"friseur '{friseur}' nicht gefunden"}
+            kalender_ids.append(kalender_id)
 
         gemeinsame = finde_gemeinsame_freie_termine(kalender_ids)
         if gemeinsame:
@@ -89,16 +76,15 @@ async def kalender_verwalten(request: Request):
 
         erfolge = []
         for kunde in kunden:
-            leistung = kunde.get("leistung")
-            mitarbeiter = finde_mitarbeiter_nach_leistung(leistung)
-            if not mitarbeiter:
-                erfolge.append({"name": kunde.get("name"), "status": "kein friseur gefunden"})
+            friseur = kunde.get("friseur")
+            kalender_id = CALENDAR_IDS.get(friseur)
+            if not kalender_id:
+                erfolge.append({"name": kunde.get("name"), "status": "friseur nicht gefunden"})
                 continue
-            kalender_id = CALENDAR_IDS[mitarbeiter]
             ok = buche_termin(
                 kalender_id,
                 kunde.get("name"),
-                kunde.get("leistung"),
+                "Termin",
                 kunde.get("datum"),
                 kunde.get("uhrzeit"),
                 kunde.get("bemerkung")
