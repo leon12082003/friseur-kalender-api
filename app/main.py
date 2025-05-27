@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from app.models import (
     TerminAnfrage, TerminAbsage, TerminVerschiebung,
-    FreieZeitenAnfrage, KombiAnfrage
+    FreieZeitenAnfrage
 )
 from app.calendar_logic import *
 
@@ -46,24 +46,24 @@ async def kalender_verwalten(request: Request):
         )
         return {"status": "ok" if erfolg else "fehler"}
 
-elif aktion == "kombi":
-    kunden = daten.get("kunden", [])
-    if len(kunden) < 2:
-        return {"status": "mindestens zwei kunden erforderlich"}
+    elif aktion == "kombi":
+        kunden = body.get("daten", {}).get("kunden", [])
+        if len(kunden) < 2:
+            return {"status": "mindestens zwei kunden erforderlich"}
 
-    kalender_ids = []
-    for kunde in kunden:
-        leistung = kunde.get("leistung")
-        passende = finde_mitarbeiter_fuer_leistung(leistung)
-        if not passende:
-            return {"status": f"keine zuständige friseur:in für '{leistung}' gefunden"}
-        name = passende[0]
-        kalender_ids.append(CALENDAR_IDS[name])
+        kalender_ids = []
+        for kunde in kunden:
+            leistung = kunde.get("leistung")
+            passende = finde_mitarbeiter_fuer_leistung(leistung)
+            if not passende:
+                return {"status": f"keine zuständige friseur:in für '{leistung}' gefunden"}
+            name = passende[0]
+            kalender_ids.append(CALENDAR_IDS[name])
 
-    gemeinsame = finde_gemeinsame_freie_termine(kalender_ids)
-    if gemeinsame:
-        return {"status": "kombitermine", "slots": gemeinsame}
-    else:
-        return {"status": "keine gemeinsamen termine gefunden"}
+        gemeinsame = finde_gemeinsame_freie_termine(kalender_ids)
+        if gemeinsame:
+            return {"status": "kombitermine", "slots": gemeinsame}
+        else:
+            return {"status": "keine gemeinsamen termine gefunden"}
 
-return {"status": "unbekannte aktion"}
+    return {"status": "unbekannte aktion"}
