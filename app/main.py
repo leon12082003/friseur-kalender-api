@@ -103,3 +103,6 @@ async def kalender_verwalten(request: Request):
         return {"status": "fertig", "buchungen": erfolge}
 
     return {"status": "unbekannte aktion"}
+
+from app.date_utils import router as date_router
+app.include_router(date_router)
