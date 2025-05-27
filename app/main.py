@@ -65,3 +65,5 @@ elif aktion == "kombi":
         return {"status": "kombitermine", "slots": gemeinsame}
     else:
         return {"status": "keine gemeinsamen termine gefunden"}
+
+return {"status": "unbekannte aktion"}
