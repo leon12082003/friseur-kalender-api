@@ -26,8 +26,17 @@ async def kalender_verwalten(request: Request):
         kalender_id = CALENDAR_IDS.get(data.friseur)
         if not kalender_id:
             return {"status": "fehler", "info": "Friseur nicht gefunden"}
-        freie_termine = finde_naechste_freie_termine(kalender_id, "Termin")
-        return {"freie_termine": freie_termine}
+
+        if data.datum:
+            freie = []
+            for stunde in range(9, 18):
+                uhrzeit = f"{stunde:02d}:00"
+                if pruefe_verfuegbarkeit(kalender_id, data.datum, uhrzeit):
+                    freie.append(f"{data.datum} {uhrzeit}")
+            return {"freie_termine": freie}
+        else:
+            freie_termine = finde_naechste_freie_termine(kalender_id, "Termin")
+            return {"freie_termine": freie_termine}
 
     elif aktion == "loeschen":
         data = TerminAbsage(**body["daten"])
